@@ -125,11 +125,12 @@ MODEL_RUNNER = None
 async def websocket_recognize(websocket: WebSocket):
     """WebSocket endpoint for real-time landmark streaming, gesture tracking, and decoding."""
     await websocket.accept()
+    debounce_ms = getattr(config.tracker, "debounce_timeout_ms", getattr(config.server, "debounce_timeout_ms", 800))
     tracker = HandFingertipTracker(
         min_detection_confidence=config.tracker.min_detection_confidence,
         min_tracking_confidence=config.tracker.min_tracking_confidence,
         pinch_threshold=config.tracker.pinch_threshold,
-        debounce_timeout=config.tracker.debounce_timeout_ms / 1000.0,
+        debounce_timeout=debounce_ms / 1000.0,
     )
     preprocessor = TrajectoryPreprocessor()
     logger.info("WebSocket client connected to /ws/recognize")

@@ -155,7 +155,7 @@ class HandFingertipTracker:
             self._fps = 0.9 * self._fps + 0.1 * (1.0 / dt)
         self._prev_frame_time = now
 
-        result = FrameResult(hand_detected=True, fps=self._fps)
+        result = FrameResult(hand_detected=False, fps=self._fps)
 
         # Convert landmarks to structured format if needed
         # Each landmark has x, y, z
@@ -186,6 +186,7 @@ class HandFingertipTracker:
         if len(lm_objs) < 21:
             return result
 
+        result.hand_detected = True
         hand_scale = self._calculate_hand_scale(lm_objs)
 
         # Fingertip coordinates (landmark 8)

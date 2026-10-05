@@ -12,6 +12,7 @@ class TrackerConfig:
     max_num_hands: int = 1
     # Pinch detection: normalized distance between thumb tip (4) and index tip (8)
     pinch_threshold: float = 0.06
+    debounce_timeout_ms: int = 800
     # One Euro filter params
     filter_min_cutoff: float = 1.0
     filter_beta: float = 0.05

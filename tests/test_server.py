@@ -40,3 +40,17 @@ def test_collect_sample_and_stats():
     stats = stats_resp.json()
     assert stats["total_samples"] >= 1
     assert "B" in stats["samples_by_class"]
+
+
+def test_websocket_recognize():
+    with client.websocket_connect("/ws/recognize") as ws:
+        # Send empty landmarks frame
+        ws.send_json({"type": "landmarks", "landmarks": [], "timestamp": 0.0})
+        data = ws.receive_json()
+        assert data["type"] == "frame_update"
+        assert data["hand_detected"] is False
+
+        # Send clear command
+        ws.send_json({"type": "clear"})
+        clear_data = ws.receive_json()
+        assert clear_data["type"] == "cleared"
