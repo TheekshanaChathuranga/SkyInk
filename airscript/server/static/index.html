@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkyInk — Real-Time Air-Writing Recognition</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <!-- MediaPipe Hands & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <header>
+    <div class="logo-group">
+      <div class="logo-badge">SI</div>
+      <div>
+        <h1>SkyInk</h1>
+        <p style="font-size: 0.75rem; color: var(--text-dim);">Real-Time Air-Writing Recognition</p>
+      </div>
+    </div>
+    <nav class="nav-links">
+      <a href="/" class="nav-link active">Live Recognition</a>
+      <a href="/collect" class="nav-link">Data Collector</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="viewport-panel">
+      <div class="canvas-container" id="container">
+        <video id="webcam-video" playsinline autoplay muted></video>
+        <canvas id="drawing-canvas"></canvas>
+
+        <div class="hud-overlay">
+          <div class="hud-pill" id="pen-status-pill">
+            <span class="status-dot" id="pen-dot"></span>
+            <span id="pen-status-text">PEN UP (HOVER)</span>
+          </div>
+          <div class="hud-pill" style="gap: 1rem;">
+            <span id="fps-display">FPS: 0</span>
+            <span id="ws-status" style="color: var(--accent-green);">● Connected</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side-panel">
+      <div class="card">
+        <div class="card-title">Live Recognition</div>
+        <div class="recognized-box">
+          <div class="recognized-text" id="live-char">—</div>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 0.75rem; font-size: 0.85rem; color: var(--text-dim);">
+          <span>Confidence: <strong id="confidence-val" style="color: var(--accent-cyan);">0%</strong></span>
+          <span>Latency: <strong id="latency-val" style="color: #fff;">~12ms</strong></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Text Buffer</div>
+        <textarea id="text-buffer" readonly
+          style="width: 100%; height: 90px; background: rgba(0,0,0,0.35); border: 1px solid var(--surface-border); border-radius: 8px; color: #fff; font-size: 1.1rem; padding: 0.75rem; resize: none; font-family: inherit; margin-bottom: 0.75rem;"
+          placeholder="Recognized characters appear here..."></textarea>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn-secondary" id="btn-add-space" style="flex: 1;">Space</button>
+          <button class="btn-secondary" id="btn-backspace" style="flex: 1;">Backspace</button>
+          <button class="btn-secondary" id="btn-clear-buffer" style="flex: 1;">Clear</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Gesture Guide</div>
+        <div style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem; color: var(--text-dim);">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.4rem;">🤏</span>
+            <div><strong style="color: #fff;">Pinch Thumb + Index:</strong> Pen down (write)</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.4rem;">👆</span>
+            <div><strong style="color: #fff;">Index Extended:</strong> Pen up (hover cursor)</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.4rem;">✋</span>
+            <div><strong style="color: #fff;">Open Palm (1s):</strong> Clear canvas</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Controls</div>
+        <div class="button-group">
+          <button class="btn-secondary" id="btn-clear-canvas">Clear Canvas (C)</button>
+          <button class="btn-secondary" id="btn-undo-stroke">Undo Stroke (U)</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
