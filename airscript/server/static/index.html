@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SkyInk — Real-Time Air-Writing Recognition</title>
   <link rel="stylesheet" href="/static/css/style.css">
-  <!-- MediaPipe Hands & Camera Utils -->
+  <!-- MediaPipe Hands -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 </head>
@@ -33,12 +33,18 @@
         <div class="hud-overlay">
           <div class="hud-pill" id="pen-status-pill">
             <span class="status-dot" id="pen-dot"></span>
-            <span id="pen-status-text">PEN UP (HOVER)</span>
+            <span id="pen-status-text">CAMERA INITIALIZING...</span>
           </div>
           <div class="hud-pill" style="gap: 1rem;">
+            <span id="hand-indicator" style="color: var(--accent-cyan);">Hand: Searching...</span>
             <span id="fps-display">FPS: 0</span>
             <span id="ws-status" style="color: var(--accent-green);">● Connected</span>
           </div>
+        </div>
+
+        <div id="cam-status-banner" style="position: absolute; bottom: 1rem; left: 1rem; right: 1rem; padding: 0.6rem 1rem; background: rgba(15,23,42,0.85); backdrop-filter: blur(8px); border-radius: 8px; border: 1px solid var(--surface-border); font-size: 0.82rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; z-index: 25; pointer-events: none;">
+          <span id="cam-status-msg">💡 Bring your hand in front of the camera to start air-writing.</span>
+          <span id="pinch-meter" style="color: #38bdf8;">Pinch: —</span>
         </div>
       </div>
     </section>
@@ -68,18 +74,37 @@
       </div>
 
       <div class="card">
+        <div class="card-title">Writing Mode & Skeleton</div>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <label style="font-size: 0.82rem; color: var(--text-dim); display: flex; justify-content: space-between; align-items: center;">
+            Writing Trigger:
+            <select id="gesture-mode" style="background: rgba(0,0,0,0.4); color: #fff; border: 1px solid var(--surface-border); padding: 0.3rem 0.6rem; border-radius: 6px;">
+              <option value="pinch" selected>🤏 Pinch (Thumb + Index)</option>
+              <option value="point">👆 Pointing (Magic Wand)</option>
+              <option value="auto">⚡ Auto (Pinch or Point)</option>
+            </select>
+          </label>
+
+          <label style="font-size: 0.82rem; color: var(--text-dim); display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="show-skeleton" checked style="accent-color: var(--accent-cyan);">
+            <span>Show Hand Skeleton (Real-Time Joints)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-title">Gesture Guide</div>
         <div style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem; color: var(--text-dim);">
           <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <span style="font-size: 1.4rem;">🤏</span>
-            <div><strong style="color: #fff;">Pinch Thumb + Index:</strong> Pen down (write)</div>
+            <span style="font-size: 1.3rem;">🤏</span>
+            <div><strong style="color: #fff;">Pinch:</strong> Pen down to write</div>
           </div>
           <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <span style="font-size: 1.4rem;">👆</span>
-            <div><strong style="color: #fff;">Index Extended:</strong> Pen up (hover cursor)</div>
+            <span style="font-size: 1.3rem;">👆</span>
+            <div><strong style="color: #fff;">Hover:</strong> Move pointer without drawing</div>
           </div>
           <div style="display: flex; align-items: center; gap: 0.75rem;">
-            <span style="font-size: 1.4rem;">✋</span>
+            <span style="font-size: 1.3rem;">✋</span>
             <div><strong style="color: #fff;">Open Palm (1s):</strong> Clear canvas</div>
           </div>
         </div>

@@ -264,32 +264,53 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
-// Initialize Camera and MediaPipe Hands
+// Initialize Camera and MediaPipe Hands with direct getUserMedia
 async function init() {
   updateTargetDisplay();
 
-  const hands = new Hands({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-  });
-
-  hands.setOptions({
-    maxNumHands: 1,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.7,
-    minTrackingConfidence: 0.7
-  });
-
-  hands.onResults(onResults);
-
-  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await hands.send({ image: videoElement });
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: "user"
       },
-      width: 640,
-      height: 480
+      audio: false
     });
-    camera.start();
+
+    videoElement.srcObject = stream;
+    await videoElement.play();
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    hands.onResults(onResults);
+
+    let isProcessing = false;
+    async function processLoop() {
+      if (videoElement.readyState >= 2 && !isProcessing) {
+        isProcessing = true;
+        try {
+          await hands.send({ image: videoElement });
+        } catch (err) {
+          console.warn("Hands error:", err);
+        }
+        isProcessing = false;
+      }
+      requestAnimationFrame(processLoop);
+    }
+    processLoop();
+  } catch (err) {
+    console.error("Camera access error:", err);
+    penStatusText.textContent = "CAMERA ACCESS ERROR";
   }
 }
 

@@ -1,4 +1,4 @@
-// SkyInk Live Air-Writing Recognition Client
+// SkyInk Live Air-Writing Recognition & Hand Pose Engine
 const videoElement = document.getElementById("webcam-video");
 const canvasElement = document.getElementById("drawing-canvas");
 const canvasCtx = canvasElement.getContext("2d");
@@ -8,17 +8,34 @@ const penDot = document.getElementById("pen-dot");
 const penStatusText = document.getElementById("pen-status-text");
 const fpsDisplay = document.getElementById("fps-display");
 const wsStatus = document.getElementById("ws-status");
+const handIndicator = document.getElementById("hand-indicator");
+const camStatusMsg = document.getElementById("cam-status-msg");
+const pinchMeter = document.getElementById("pinch-meter");
 
 const liveChar = document.getElementById("live-char");
 const confidenceVal = document.getElementById("confidence-val");
 const latencyVal = document.getElementById("latency-val");
 const textBuffer = document.getElementById("text-buffer");
+const gestureModeSelect = document.getElementById("gesture-mode");
+const showSkeletonCheckbox = document.getElementById("show-skeleton");
 
 let ws = null;
 let lastFrameTime = performance.now();
 let fps = 0;
 let currentStrokes = [];
 let isPenDown = false;
+let latestLandmarks = null;
+let openPalmStartTime = null;
+
+// MediaPipe 21 Hand Skeleton Connections
+const HAND_CONNECTIONS = [
+  [0, 1], [1, 2], [2, 3], [3, 4],       // Thumb
+  [0, 5], [5, 6], [6, 7], [7, 8],       // Index
+  [5, 9], [9, 10], [10, 11], [11, 12],  // Middle
+  [9, 13], [13, 14], [14, 15], [15, 16],// Ring
+  [13, 17], [17, 18], [18, 19], [19, 20],// Pinky
+  [0, 17]                               // Palm base
+];
 
 // Initialize WebSocket connection
 function connectWebSocket() {
@@ -41,10 +58,6 @@ function connectWebSocket() {
     try {
       const data = JSON.parse(event.data);
       if (data.type === "frame_update") {
-        isPenDown = data.is_pen_down;
-        penDot.className = isPenDown ? "status-dot active" : "status-dot";
-        penStatusText.textContent = isPenDown ? "PEN DOWN (WRITING)" : "PEN UP (HOVER)";
-
         if (data.action_trigger === "clear") {
           currentStrokes = [];
           renderCanvas();
@@ -62,9 +75,40 @@ function connectWebSocket() {
         }
       }
     } catch (err) {
-      console.error("WS parse error:", err);
+      console.error("WS error:", err);
     }
   };
+}
+
+function renderHandSkeleton(landmarks, w, h) {
+  if (!landmarks || landmarks.length < 21 || !showSkeletonCheckbox.checked) return;
+
+  // Draw bone lines
+  canvasCtx.lineWidth = 2.5;
+  canvasCtx.strokeStyle = "rgba(6, 182, 212, 0.45)";
+  canvasCtx.lineCap = "round";
+
+  for (const [startIdx, endIdx] of HAND_CONNECTIONS) {
+    const p1 = landmarks[startIdx];
+    const p2 = landmarks[endIdx];
+    canvasCtx.beginPath();
+    canvasCtx.moveTo(p1.x * w, p1.y * h);
+    canvasCtx.lineTo(p2.x * w, p2.y * h);
+    canvasCtx.stroke();
+  }
+
+  // Draw joint landmarks
+  for (let i = 0; i < landmarks.length; i++) {
+    const pt = landmarks[i];
+    const cx = pt.x * w;
+    const cy = pt.y * h;
+    const isTip = [4, 8, 12, 16, 20].includes(i);
+
+    canvasCtx.beginPath();
+    canvasCtx.arc(cx, cy, isTip ? 5 : 3, 0, 2 * Math.PI);
+    canvasCtx.fillStyle = isTip ? "#38bdf8" : "rgba(255, 255, 255, 0.7)";
+    canvasCtx.fill();
+  }
 }
 
 function renderCanvas(fingertip = null) {
@@ -72,11 +116,16 @@ function renderCanvas(fingertip = null) {
   const w = canvasElement.width;
   const h = canvasElement.height;
 
-  // Render all active strokes with neon glow
+  // 1. Draw Hand Skeleton
+  if (latestLandmarks) {
+    renderHandSkeleton(latestLandmarks, w, h);
+  }
+
+  // 2. Draw Trajectory Strokes
   for (const stroke of currentStrokes) {
     if (stroke.length < 2) continue;
 
-    // Glowing outer halo
+    // Glowing halo
     canvasCtx.beginPath();
     canvasCtx.strokeStyle = "rgba(6, 182, 212, 0.35)";
     canvasCtx.lineWidth = 10;
@@ -88,7 +137,7 @@ function renderCanvas(fingertip = null) {
     }
     canvasCtx.stroke();
 
-    // Vibrant core stroke
+    // Sharp core line
     canvasCtx.beginPath();
     canvasCtx.strokeStyle = "#38bdf8";
     canvasCtx.lineWidth = 4;
@@ -99,21 +148,31 @@ function renderCanvas(fingertip = null) {
     canvasCtx.stroke();
   }
 
-  // Fingertip cursor indicator
-  if (fingertip) {
-    const cx = fingertip[0] * w;
-    const cy = fingertip[1] * h;
+  // 3. Fingertip indicator
+  const tip = fingertip || (latestLandmarks ? latestLandmarks[8] : null);
+  if (tip) {
+    const cx = (tip.x || tip[0]) * w;
+    const cy = (tip.y || tip[1]) * h;
+
     canvasCtx.beginPath();
-    canvasCtx.arc(cx, cy, isPenDown ? 12 : 7, 0, 2 * Math.PI);
-    canvasCtx.fillStyle = isPenDown ? "#10b981" : "#38bdf8";
+    canvasCtx.arc(cx, cy, isPenDown ? 13 : 8, 0, 2 * Math.PI);
+    canvasCtx.fillStyle = isPenDown ? "#10b981" : "#0284c7";
     canvasCtx.fill();
-    canvasCtx.lineWidth = 2;
+    canvasCtx.lineWidth = 2.5;
     canvasCtx.strokeStyle = "#ffffff";
     canvasCtx.stroke();
+
+    if (isPenDown) {
+      canvasCtx.beginPath();
+      canvasCtx.arc(cx, cy, 20, 0, 2 * Math.PI);
+      canvasCtx.strokeStyle = "rgba(16, 185, 129, 0.5)";
+      canvasCtx.lineWidth = 2;
+      canvasCtx.stroke();
+    }
   }
 }
 
-// MediaPipe results handler
+// MediaPipe Results Handler
 function onResults(results) {
   const now = performance.now();
   const dt = now - lastFrameTime;
@@ -123,20 +182,91 @@ function onResults(results) {
     fpsDisplay.textContent = `FPS: ${fps.toFixed(0)}`;
   }
 
-  if (canvasElement.width !== videoElement.videoWidth && videoElement.videoWidth > 0) {
+  if (videoElement.videoWidth > 0 && canvasElement.width !== videoElement.videoWidth) {
     canvasElement.width = videoElement.videoWidth;
     canvasElement.height = videoElement.videoHeight;
   }
 
   if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
     const rawLm = results.multiHandLandmarks[0];
+
     // Mirror X coordinates for natural interaction
     const mirroredLm = rawLm.map((lm) => ({
       x: 1.0 - lm.x,
       y: lm.y,
       z: lm.z || 0.0,
     }));
+    latestLandmarks = mirroredLm;
 
+    handIndicator.textContent = "Hand: Detected";
+    handIndicator.style.color = "var(--accent-green)";
+
+    // Compute hand scale (wrist 0 to middle MCP 9)
+    const wrist = mirroredLm[0];
+    const middleMcp = mirroredLm[9];
+    const handScale = Math.max(Math.hypot(middleMcp.x - wrist.x, middleMcp.y - wrist.y), 0.01);
+
+    // Gestures
+    const thumb = mirroredLm[4];
+    const index = mirroredLm[8];
+    const pinchDist = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+    const normalizedPinch = pinchDist / handScale;
+
+    // Pointing detection: index extended, other 3 folded
+    const indexExtended = mirroredLm[8].y < mirroredLm[6].y;
+    const middleFolded = mirroredLm[12].y > mirroredLm[10].y;
+    const ringFolded = mirroredLm[16].y > mirroredLm[14].y;
+    const pinkyFolded = mirroredLm[20].y > mirroredLm[18].y;
+    const isPointing = indexExtended && middleFolded && ringFolded && pinkyFolded;
+
+    // Open palm detection: all 5 extended
+    const indexUp = mirroredLm[8].y < mirroredLm[6].y;
+    const middleUp = mirroredLm[12].y < mirroredLm[10].y;
+    const ringUp = mirroredLm[16].y < mirroredLm[14].y;
+    const pinkyUp = mirroredLm[20].y < mirroredLm[18].y;
+    const isOpenPalm = indexUp && middleUp && ringUp && pinkyUp;
+
+    if (isOpenPalm) {
+      if (!openPalmStartTime) openPalmStartTime = now;
+      const elapsed = Math.round((now - openPalmStartTime) / 100) / 10;
+      camStatusMsg.textContent = `✋ Open Palm detected! Hold to clear (${elapsed}s / 1.0s)`;
+      if (now - openPalmStartTime >= 1000) {
+        currentStrokes = [];
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "clear" }));
+        camStatusMsg.textContent = "🧹 Canvas Cleared!";
+        openPalmStartTime = null;
+      }
+    } else {
+      openPalmStartTime = null;
+    }
+
+    // Determine writing state
+    const mode = gestureModeSelect.value;
+    const PINCH_THRESHOLD = 0.18; // generous threshold for natural air writing
+    let penDown = false;
+
+    if (mode === "pinch") {
+      penDown = normalizedPinch < PINCH_THRESHOLD;
+      pinchMeter.textContent = `Pinch: ${normalizedPinch.toFixed(2)} (Thresh: ${PINCH_THRESHOLD})`;
+    } else if (mode === "point") {
+      penDown = isPointing;
+      pinchMeter.textContent = `Pointing: ${isPointing ? "YES" : "NO"}`;
+    } else { // auto
+      penDown = (normalizedPinch < PINCH_THRESHOLD) || isPointing;
+      pinchMeter.textContent = `Dist: ${normalizedPinch.toFixed(2)} | Point: ${isPointing ? "YES" : "NO"}`;
+    }
+
+    isPenDown = penDown;
+    penDot.className = isPenDown ? "status-dot active" : "status-dot";
+    penStatusText.textContent = isPenDown ? "PEN DOWN (WRITING)" : "PEN UP (HOVER)";
+
+    if (!isOpenPalm) {
+      camStatusMsg.textContent = isPenDown
+        ? "✍️ Writing stroke active... Release pinch when done"
+        : "✨ Hovering cursor. Pinch thumb + index to draw";
+    }
+
+    // Stream landmarks to backend
     if (ws && ws.readyState === WebSocket.OPEN) {
       const sendStart = performance.now();
       ws.send(
@@ -148,14 +278,25 @@ function onResults(results) {
       );
       latencyVal.textContent = `~${Math.round(performance.now() - sendStart)}ms`;
     }
+
+    renderCanvas(mirroredLm[8]);
   } else {
+    latestLandmarks = null;
+    handIndicator.textContent = "Hand: Searching...";
+    handIndicator.style.color = "var(--accent-red)";
+    penDot.className = "status-dot";
+    penStatusText.textContent = "NO HAND DETECTED";
+    camStatusMsg.textContent = "💡 Bring your hand in front of the camera with fingers visible.";
+    pinchMeter.textContent = "Pinch: —";
+
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "landmarks", landmarks: [], timestamp: now / 1000 }));
     }
+    renderCanvas();
   }
 }
 
-// UI Button Handlers
+// UI Controls
 document.getElementById("btn-add-space").addEventListener("click", () => {
   textBuffer.value += " ";
 });
@@ -170,20 +311,16 @@ document.getElementById("btn-clear-buffer").addEventListener("click", () => {
 });
 
 document.getElementById("btn-clear-canvas").addEventListener("click", () => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "clear" }));
-  }
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "clear" }));
   currentStrokes = [];
   renderCanvas();
 });
 
 document.getElementById("btn-undo-stroke").addEventListener("click", () => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "undo" }));
-  }
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "undo" }));
 });
 
-// Keyboard shortcuts
+// Keyboard hotkeys
 window.addEventListener("keydown", (e) => {
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
   if (e.key === "c" || e.key === "C") {
@@ -200,32 +337,59 @@ window.addEventListener("keydown", (e) => {
   }
 });
 
-// Initialize Camera and MediaPipe Hands
+// Robust Camera and MediaPipe Hands Initializer
 async function init() {
   connectWebSocket();
 
-  const hands = new Hands({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
-  });
-
-  hands.setOptions({
-    maxNumHands: 1,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.7,
-    minTrackingConfidence: 0.7,
-  });
-
-  hands.onResults(onResults);
-
-  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await hands.send({ image: videoElement });
+  try {
+    camStatusMsg.textContent = "📷 Requesting webcam access...";
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 640 },
+        height: { ideal: 480 },
+        facingMode: "user"
       },
-      width: 640,
-      height: 480,
+      audio: false
     });
-    camera.start();
+
+    videoElement.srcObject = stream;
+    await videoElement.play();
+    camStatusMsg.textContent = "✅ Camera ready. Initializing MediaPipe Hands...";
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5, // 0.5 for fast robust detection
+      minTrackingConfidence: 0.5,
+    });
+
+    hands.onResults(onResults);
+
+    let isProcessing = false;
+    async function processLoop() {
+      if (videoElement.readyState >= 2 && !isProcessing) {
+        isProcessing = true;
+        try {
+          await hands.send({ image: videoElement });
+        } catch (err) {
+          console.warn("Hands.send error:", err);
+        }
+        isProcessing = false;
+      }
+      requestAnimationFrame(processLoop);
+    }
+
+    processLoop();
+    camStatusMsg.textContent = "✨ SkyInk ready! Bring your hand into view.";
+  } catch (err) {
+    console.error("Camera access error:", err);
+    camStatusMsg.textContent = `❌ Camera error: ${err.message}. Please allow camera permissions in browser.`;
+    penStatusText.textContent = "CAMERA ERROR";
+    penDot.className = "status-dot";
   }
 }
 
