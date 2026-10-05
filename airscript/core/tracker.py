@@ -122,23 +122,44 @@ class HandFingertipTracker:
         normalized_dist = dist / hand_scale
         return normalized_dist < self.pinch_threshold, normalized_dist
 
+    def get_finger_states(self, landmarks) -> Tuple[bool, bool, bool, bool, bool]:
+        """Computes whether [thumb, index, middle, ring, pinky] are extended.
+        Uses rotation-invariant wrist distance combined with joint geometry.
+        """
+        wrist = landmarks[0]
+
+        def is_finger_extended(tip_idx: int, pip_idx: int, mcp_idx: int) -> bool:
+            d_tip = math.hypot(landmarks[tip_idx].x - wrist.x, landmarks[tip_idx].y - wrist.y)
+            d_pip = math.hypot(landmarks[pip_idx].x - wrist.x, landmarks[pip_idx].y - wrist.y)
+            d_mcp = math.hypot(landmarks[mcp_idx].x - wrist.x, landmarks[mcp_idx].y - wrist.y)
+            # Tip must be noticeably farther from wrist than PIP and MCP
+            return d_tip > d_pip * 1.05 and d_tip > d_mcp * 1.15
+
+        # Thumb
+        d_thumb_tip = math.hypot(landmarks[4].x - wrist.x, landmarks[4].y - wrist.y)
+        d_thumb_mcp = math.hypot(landmarks[2].x - wrist.x, landmarks[2].y - wrist.y)
+        thumb_up = d_thumb_tip > d_thumb_mcp * 1.1
+
+        index_up = is_finger_extended(8, 6, 5)
+        middle_up = is_finger_extended(12, 10, 9)
+        ring_up = is_finger_extended(16, 14, 13)
+        pinky_up = is_finger_extended(20, 18, 17)
+
+        return thumb_up, index_up, middle_up, ring_up, pinky_up
+
     def _is_pointing(self, landmarks) -> bool:
-        """Detects pointing: index extended, other 3 fingers folded."""
-        index_tip = landmarks[8].y < landmarks[6].y
-        middle_folded = landmarks[12].y > landmarks[10].y
-        ring_folded = landmarks[16].y > landmarks[14].y
-        pinky_folded = landmarks[20].y > landmarks[18].y
-        return index_tip and middle_folded and ring_folded and pinky_folded
+        """Detects 1 finger pointing: Index extended, Middle & Ring folded (Pen Down)."""
+        _, index_up, middle_up, ring_up, _ = self.get_finger_states(landmarks)
+        return index_up and (not middle_up) and (not ring_up)
+
+    def _is_hovering(self, landmarks) -> bool:
+        """Detects 2 fingers: Index + Middle extended (Pen Up / Move cursor)."""
+        _, index_up, middle_up, ring_up, _ = self.get_finger_states(landmarks)
+        return index_up and middle_up and (not ring_up)
 
     def _is_open_palm(self, landmarks) -> bool:
-        """Detects open palm gesture (all fingers extended)."""
-        fingers_up = (
-            landmarks[4].x < landmarks[3].x if landmarks[4].x < landmarks[0].x else landmarks[4].x > landmarks[3].x
-        )
-        index_up = landmarks[8].y < landmarks[6].y
-        middle_up = landmarks[12].y < landmarks[10].y
-        ring_up = landmarks[16].y < landmarks[14].y
-        pinky_up = landmarks[20].y < landmarks[18].y
+        """Detects open palm gesture (4 or 5 fingers extended)."""
+        _, index_up, middle_up, ring_up, pinky_up = self.get_finger_states(landmarks)
         return index_up and middle_up and ring_up and pinky_up
 
     def process_landmarks(
@@ -213,12 +234,12 @@ class HandFingertipTracker:
 
         # Determine pen-down state
         is_pen_down = False
-        if self.gesture_mode == "pinch":
+        if self.gesture_mode in ("point", "one_finger"):
+            is_pen_down = self._is_pointing(lm_objs)
+        elif self.gesture_mode == "pinch":
             pinch_detected, _ = self._is_pinch(lm_objs, hand_scale)
             is_pen_down = pinch_detected
-        elif self.gesture_mode == "point":
-            is_pen_down = self._is_pointing(lm_objs)
-        else:  # "auto": pinch or pointing
+        else:  # "auto": 1 finger pointing or pinch
             pinch_detected, _ = self._is_pinch(lm_objs, hand_scale)
             is_pen_down = pinch_detected or self._is_pointing(lm_objs)
 

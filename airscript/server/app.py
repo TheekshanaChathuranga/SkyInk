@@ -150,6 +150,9 @@ async def websocket_recognize(websocket: WebSocket):
                 await websocket.send_json({"type": "undone"})
                 continue
 
+            if "gesture_mode" in data:
+                tracker.gesture_mode = data["gesture_mode"]
+
             landmarks = data.get("landmarks", [])
             ts = data.get("timestamp", time.perf_counter())
 
