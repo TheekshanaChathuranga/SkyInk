@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AirScript — Data Collection</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <!-- MediaPipe Hands & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <header>
+    <div class="logo-group">
+      <div class="logo-badge">AS</div>
+      <div>
+        <h1>AirScript</h1>
+        <p style="font-size: 0.75rem; color: var(--text-dim);">Trajectory Data Collector</p>
+      </div>
+    </div>
+    <nav class="nav-links">
+      <a href="/" class="nav-link">Live Recognition</a>
+      <a href="/collect" class="nav-link active">Data Collector</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="viewport-panel">
+      <div class="canvas-container" id="container">
+        <video id="webcam-video" playsinline autoplay muted></video>
+        <canvas id="drawing-canvas"></canvas>
+
+        <div class="hud-overlay">
+          <div class="hud-pill" id="pen-status-pill">
+            <span class="status-dot" id="pen-dot"></span>
+            <span id="pen-status-text">PEN UP (HOVER)</span>
+          </div>
+          <div class="hud-pill">
+            <span id="fps-display">FPS: 0</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side-panel">
+      <div class="card prompt-box">
+        <div class="card-title">Current Target</div>
+        <div class="target-char" id="target-char">A</div>
+        <p style="font-size: 0.82rem; color: var(--text-dim);" id="prompt-hint">
+          Pinch thumb + index to write in air
+        </p>
+      </div>
+
+      <div class="card">
+        <div class="card-title">User & Session</div>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <input type="text" id="user-input" value="user_1" placeholder="User ID"
+            style="flex: 1; padding: 0.5rem; border-radius: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--surface-border); color: #fff;">
+          <button id="btn-next-target" class="btn-secondary" style="padding: 0.5rem 0.8rem;">Next</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Actions & Hotkeys</div>
+        <div class="button-group">
+          <button class="btn-primary" id="btn-save">Save Sample (Space)</button>
+          <button class="btn-secondary" id="btn-clear">Clear (C)</button>
+          <button class="btn-secondary" id="btn-undo">Undo (U)</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Collection Stats</div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-label">Total Saved</div>
+            <div class="stat-value" id="stat-total">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Current Target</div>
+            <div class="stat-value" id="stat-target-count">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Strokes</div>
+            <div class="stat-value" id="stat-strokes">0</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">Points</div>
+            <div class="stat-value" id="stat-points">0</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="/static/js/collect.js"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Model checkpoints & cache
+checkpoints/
+*.pt
+*.pth
+*.onnx
+
+# Data (preserve structure via .gitkeep)
+data/raw/*.json
+data/raw/*.npz
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
